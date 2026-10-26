@@ -12,7 +12,7 @@ Status: prototype, not verified against real cameras, the render PC, or the ATEM
 
 - `src/freed.js`: parses FreeD D1 packets (29 bytes, checksum checked).
 - `src/camera-mapping.js`: FreeD pose to three.js camera (mm to m, lens table, field of view). The lens table is a placeholder until calibration.
-- `src/server.js`: one UDP listener per virtual camera (`FREED_PORT_1`, `FREED_PORT_2`) and a browser page over Server-Sent Events.
+- `src/server.js`: one UDP port (`FREED_PORT`, default 40000) for both cameras, routed by FreeD camera id (`FREED_CAMERA_IDS`, default `101=cam1,102=cam2`) and a browser page over Server-Sent Events.
 - `public/`: three.js scene with one floor label and two virtual cameras. Each camera gives a fill and a key output (white graphic on black).
 
 Run:
@@ -23,4 +23,4 @@ npm test
 SIMULATE=1 npm start   # open http://localhost:8080/ with a synthetic FreeD sweep
 ```
 
-Without `SIMULATE`, point each physical camera's FreeD output at this host's UDP ports (default 40001 and 40002). Values and conventions (port, mode, pan/tilt signs, position origin) are unverified until checked on the camera's FreeD page and on site.
+Without `SIMULATE`, point both cameras' FreeD output at this host's UDP port 40000. Values and conventions (port, mode, pan/tilt signs, position origin) are unverified until checked on the camera's FreeD page and on site.
