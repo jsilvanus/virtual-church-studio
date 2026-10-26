@@ -3,7 +3,7 @@
 // It sends nothing back and does not drive any camera.
 //
 // Usage:
-//   node src/freed-listener.js [--port 40001] [--host 0.0.0.0]
+//   node src/freed-listener.js [--port 40000] [--host 0.0.0.0]
 //   Env: FREED_PORT, FREED_HOST (flags win over env)
 
 import dgram from 'node:dgram';
