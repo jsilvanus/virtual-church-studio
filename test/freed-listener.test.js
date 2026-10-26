@@ -5,7 +5,7 @@ import { parseArgs, startListener } from '../src/freed-listener.js';
 import { encodeFreeD } from '../src/freed.js';
 
 test('parseArgs reads flags and env, flags win', () => {
-  assert.deepEqual(parseArgs([], {}), { port: 40001, host: '0.0.0.0' });
+  assert.deepEqual(parseArgs([], {}), { port: 40000, host: '0.0.0.0' });
   assert.deepEqual(parseArgs([], { FREED_PORT: '5000', FREED_HOST: '127.0.0.1' }), { port: 5000, host: '127.0.0.1' });
   assert.equal(parseArgs(['--port', '6000'], { FREED_PORT: '5000' }).port, 6000);
   assert.throws(() => parseArgs(['--port', '99999'], {}), /invalid port/);

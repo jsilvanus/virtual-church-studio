@@ -3,7 +3,7 @@
 // It sends nothing back and does not drive any camera.
 //
 // Usage:
-//   node src/freed-listener.js [--port 40001] [--host 0.0.0.0]
+//   node src/freed-listener.js [--port 40000] [--host 0.0.0.0]
 //   Env: FREED_PORT, FREED_HOST (flags win over env)
 
 import dgram from 'node:dgram';
@@ -11,7 +11,7 @@ import { parseFreeD } from './freed.js';
 
 export function parseArgs(argv, env = process.env) {
   const opts = {
-    port: Number(env.FREED_PORT ?? 40001),
+    port: Number(env.FREED_PORT ?? 40000),
     host: env.FREED_HOST ?? '0.0.0.0',
   };
   for (let i = 0; i < argv.length; i += 1) {
