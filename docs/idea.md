@@ -41,3 +41,9 @@ A static camera needs no FreeD delay and no lens table, so this test checks the 
 - Which render engine fits the church's budget and the GPU PC?
 - How much calibration work is needed for each camera position?
 - Whether the lens table can be built once and reused.
+
+## Notes (2026-10-26)
+
+- Juha asked for this idea to be recorded in this repo. Still no plan.
+- FreeD on the PTZ330: our keskuskirkko hardware notes (`docs/hardware/aver-ptz330.md`) do not mention FreeD. Juha saw a FreeD setting on the camera's web page, so it probably exists in the firmware. Not yet checked against AVer's documents.
+- The same notes list VISCA position inquiries over IP (`PT_PosInq`, `CAM_ZoomPosInq`). They could report pan, tilt and zoom, but they are not FreeD.
