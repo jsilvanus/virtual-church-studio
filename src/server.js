@@ -4,9 +4,9 @@
 //
 // Env:
 //   PORT            HTTP port (default 8080)
-//   FREED_PORT_1    UDP port for virtual camera 1 (default 40001)
-//   FREED_PORT_2    UDP port for virtual camera 2 (default 40002)
-//   SIMULATE=1      also send a slow synthetic FreeD sweep to both ports (for a dry run)
+//   FREED_PORT      UDP port both cameras send to (default 40000)
+//   FREED_CAMERA_IDS  camera id to virtual camera map (default "101=cam1,102=cam2")
+//   SIMULATE=1      also send a slow synthetic FreeD sweep to the port (for a dry run)
 
 import http from 'node:http';
 import dgram from 'node:dgram';
@@ -14,17 +14,17 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { parseFreeD, encodeFreeD } from './freed.js';
+import { routeCameraId, parseCameraIds } from './camera-routing.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
 
 const config = {
   httpPort: Number(process.env.PORT ?? 8080),
-  cameras: [
-    { id: 'cam1', udpPort: Number(process.env.FREED_PORT_1 ?? 40001) },
-    { id: 'cam2', udpPort: Number(process.env.FREED_PORT_2 ?? 40002) },
-  ],
+  udpPort: Number(process.env.FREED_PORT ?? 40000),
+  cameraIds: parseCameraIds(process.env.FREED_CAMERA_IDS),
 };
+const cameraNames = [...new Set(Object.values(config.cameraIds))];
 
 const clients = new Set();
 const latest = {};
@@ -34,32 +34,35 @@ function broadcast(event) {
   for (const res of clients) res.write(line);
 }
 
-function startListener(cam) {
+function startListener() {
   const socket = dgram.createSocket('udp4');
   socket.on('message', (msg, rinfo) => {
     let pose;
     try {
       pose = parseFreeD(msg);
     } catch (err) {
-      console.warn(`[${cam.id}] dropped packet from ${rinfo.address}: ${err.message}`);
+      console.warn(`dropped packet from ${rinfo.address}: ${err.message}`);
       return;
     }
-    const event = { cam: cam.id, from: rinfo.address, pose, at: Date.now() };
-    latest[cam.id] = event;
+    const name = routeCameraId(pose.cameraId, config.cameraIds);
+    if (!name) return; // not one of our cameras
+    const event = { cam: name, from: rinfo.address, pose, at: Date.now() };
+    latest[name] = event;
     broadcast(event);
   });
-  socket.bind(cam.udpPort, () => console.log(`[${cam.id}] FreeD on UDP ${cam.udpPort}`));
+  socket.bind(config.udpPort, () => console.log(`FreeD on UDP ${config.udpPort}`));
   return socket;
 }
 
 function startSimulator() {
   const sender = dgram.createSocket('udp4');
+  const ids = Object.keys(config.cameraIds).map(Number);
   let t = 0;
   setInterval(() => {
     t += 0.05;
-    config.cameras.forEach((cam, i) => {
+    ids.forEach((cameraId, i) => {
       const packet = encodeFreeD({
-        cameraId: i + 1,
+        cameraId,
         pan: 8 * Math.sin(t + i),
         tilt: 3 * Math.sin(t / 2),
         x: 500 * i,
@@ -67,7 +70,7 @@ function startSimulator() {
         z: -3000,
         zoom: 20000 + 15000 * Math.sin(t / 3),
       });
-      sender.send(packet, cam.udpPort, '127.0.0.1');
+      sender.send(packet, config.udpPort, '127.0.0.1');
     });
   }, 40);
 }
@@ -82,7 +85,7 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
   if (url.pathname === '/config') {
     res.writeHead(200, { 'content-type': 'application/json' });
-    res.end(JSON.stringify({ cameras: config.cameras.map(({ id, udpPort }) => ({ id, udpPort })) }));
+    res.end(JSON.stringify({ udpPort: config.udpPort, cameras: cameraNames }));
     return;
   }
   if (url.pathname === '/events') {
@@ -106,6 +109,6 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-config.cameras.forEach(startListener);
+startListener();
 if (process.env.SIMULATE === '1') startSimulator();
 server.listen(config.httpPort, () => console.log(`open http://localhost:${config.httpPort}/`));

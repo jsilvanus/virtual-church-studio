@@ -1,6 +1,6 @@
 // Small FreeD D1 listener for a camera's FreeD output (for example on kirkonpi).
-// It prints one line per valid packet and a summary every 10 seconds.
-// It sends nothing back and does not drive any camera.
+// Logs a line only when a camera's pose changes (rounded) and a summary every 10 s,
+// so a steady 60 packets/s feed does not fill the log. It sends nothing back.
 //
 // Usage:
 //   node src/freed-listener.js [--port 40000] [--host 0.0.0.0]
@@ -24,35 +24,53 @@ export function parseArgs(argv, env = process.env) {
   return opts;
 }
 
+// Key of the values that matter for a log line. Angles rounded to 0.1 degree,
+// position to 1 mm, zoom and focus as raw counts.
+function poseKey(p) {
+  return [p.pan, p.tilt, p.roll, p.x, p.y, p.z].map((v, i) => (i < 3 ? Math.round(v * 10) : Math.round(v))).join(',')
+    + `|${p.zoom}|${p.focus}`;
+}
+
 export function startListener({ port, host }, log = console) {
-  const stats = { packets: 0, bad: 0, sources: new Map(), cameras: new Set() };
+  const stats = { packets: 0, bad: 0, cameras: new Map(), sources: new Map() };
   const socket = dgram.createSocket('udp4');
 
   socket.on('message', (msg, rinfo) => {
     const source = `${rinfo.address}:${rinfo.port}`;
+    let pose;
     try {
-      const pose = parseFreeD(msg);
-      stats.packets += 1;
-      stats.cameras.add(pose.cameraId);
-      stats.sources.set(source, (stats.sources.get(source) ?? 0) + 1);
+      pose = parseFreeD(msg);
+    } catch (err) {
+      stats.bad += 1;
+      log.warn(`bad packet from=${source} length=${msg.length}: ${err.message}`);
+      return;
+    }
+    stats.packets += 1;
+    stats.sources.set(source, (stats.sources.get(source) ?? 0) + 1);
+    const cam = stats.cameras.get(pose.cameraId) ?? { count: 0, key: null, last: null };
+    cam.count += 1;
+    cam.last = pose;
+    const key = poseKey(pose);
+    if (key !== cam.key) {
+      cam.key = key;
       log.log(
         `${new Date().toISOString()} cam=${pose.cameraId} from=${source} ` +
           `pan=${pose.pan.toFixed(2)} tilt=${pose.tilt.toFixed(2)} roll=${pose.roll.toFixed(2)} ` +
           `x=${pose.x.toFixed(1)} y=${pose.y.toFixed(1)} z=${pose.z.toFixed(1)} ` +
           `zoom=${pose.zoom} focus=${pose.focus}`,
       );
-    } catch (err) {
-      stats.bad += 1;
-      log.warn(`${new Date().toISOString()} bad packet from=${source} length=${msg.length}: ${err.message}`);
     }
+    stats.cameras.set(pose.cameraId, cam);
   });
 
   const summary = setInterval(() => {
+    const cams = [...stats.cameras].map(([id, c]) => `${id}:${c.count}`).join(' ') || 'none';
     const sources = [...stats.sources].map(([s, n]) => `${s} (${n})`).join(', ') || 'none';
-    log.log(
-      `summary: packets=${stats.packets} bad=${stats.bad} ` +
-        `camera ids=[${[...stats.cameras].join(',')}] sources=${sources}`,
-    );
+    log.log(`summary: packets=${stats.packets} bad=${stats.bad} per-camera=[${cams}] sources=${sources}`);
+    stats.packets = 0;
+    stats.bad = 0;
+    stats.cameras.forEach((c) => { c.count = 0; });
+    stats.sources.clear();
   }, 10000);
   summary.unref();
 
