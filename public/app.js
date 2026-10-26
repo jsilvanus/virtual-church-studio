@@ -22,6 +22,23 @@ const previewOnly = new THREE.Group();
 scene.add(previewOnly);
 previewOnly.add(new THREE.GridHelper(10, 20, 0x555555, 0x333333));
 
+// Room architecture: placeholder until the iPhone scan is in. Preview views only,
+// so it never reaches fill or key. Dimensions are assumed, not measured.
+const room = new THREE.Group();
+const floor = new THREE.Mesh(
+  new THREE.PlaneGeometry(10, 10),
+  new THREE.MeshBasicMaterial({ color: 0x2a2a28, side: THREE.DoubleSide }),
+);
+floor.rotation.x = -Math.PI / 2;
+room.add(floor);
+const walls = new THREE.LineSegments(
+  new THREE.EdgesGeometry(new THREE.BoxGeometry(10, 4, 10)),
+  new THREE.LineBasicMaterial({ color: 0x888880 }),
+);
+walls.position.y = 2;
+room.add(walls);
+previewOnly.add(room);
+
 function makeLabelTexture(text) {
   const canvas = document.createElement('canvas');
   canvas.width = 1024;
